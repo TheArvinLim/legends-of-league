@@ -1,0 +1,81 @@
+```{r}
+library(tidyverse)
+```
+
+```{r}
+
+read_data <- function(file_name, data_folder = file.path("data")) {
+  return (read_csv(file.path(data_folder, file_name), col_types = cols(`dragons (type unknown)` = col_integer(),
+                                                                       `opp_heralds` = col_integer(),
+                                                                       `heralds` = col_integer())))
+}
+
+data_folder = file.path("data")
+first = TRUE
+
+for (file_name in list.files(data_folder)) {
+  if (first) {
+    all_data = read_data(file_name)
+    first = FALSE
+  }
+  else {
+    all_data = bind_rows(all_data, read_data(file_name))
+  }
+}
+
+player_data = all_data %>%
+  filter(!is.na(player))
+
+team_data = all_data %>%
+  filter(is.na(player))
+```
+
+```{r}
+
+N = 20
+
+player_data %>%
+  group_by(player) %>%
+  summarise(n=sum(result)) %>%
+  slice_max(order_by=n, n=N) %>%
+  filter(player != "unknown player") ->
+  top_N_players
+
+player_data %>%
+  select(player, date, result) %>%
+  filter(is.element(player, top_N_players$player)) %>%  # take the top players
+  mutate(date = as.Date(date)) %>%  # discretize dates by day
+  arrange(date) %>%  # sort dates ascending
+  group_by(player) %>%
+  mutate(csum = cumsum(result)) %>%  # cumulative wins per player
+  ggplot(aes(x=date, y=csum, colour=player)) +
+    geom_line()
+```
+
+```{r}
+player_data %>% 
+  filter(player=="Faker") %>%
+  count(team) %>%
+  arrange(desc(n))
+```
+
+```{r}
+N = 50
+
+player_data %>%
+  group_by(player) %>%
+  summarise(n=n()) %>%
+  filter(n >= N) %>% # filter to those who have played more than 50 games
+  filter(player != "unknown player") ->
+  top_N_players
+
+player_data %>% 
+  filter(is.element(player, top_N_players$player)) %>%
+  group_by(player) %>%
+  summarise(total_kills = sum(kills),
+            total_deaths = sum(deaths),
+            total_assists = sum(assists)) %>%
+  mutate(kda = (total_kills + total_assists) / total_deaths) %>%
+  arrange(desc(kda))
+```
+
